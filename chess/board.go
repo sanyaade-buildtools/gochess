@@ -1,14 +1,26 @@
 package chess
 
-type Board struct {
-	Position [128]*Piece   // 0x88 representation
-}
+import "fmt"
+
+type Board [128]*Piece   // 0x88 representation
 
 var BackRank = [2]int{ 0, 7 }
 var PawnRank = [2]int{ 1, 6 }
 
 func Tile(rank, file int) int {
 	return rank << 4 + file
+}
+
+func Rank(tile int) int {
+	return tile >> 4
+}
+
+func File(tile int) int {
+	return tile & 7
+}
+
+func Offboard(tile int) bool {
+	return tile & 0x88 != 0
 }
 
 func (b *Board) Setup() {
@@ -25,15 +37,15 @@ func (b *Board) Setup() {
 }
 
 func (b *Board) Place(tile int, color Color, kind Kind) {
-	if tile & 0x88 == 0 {
-		b.Position[tile] = &Piece{Color: color, Kind: kind}
+	if Offboard(tile) == false {
+		b[tile] = &Piece{Color: color, Kind: kind}
 	}
 }
 
 func (b *Board) Move(origin, dest int) {
-	if (origin | dest) & 0x88 == 0 {
-		b.Position[dest] = b.Position[origin]
-		b.Position[origin] = nil
+	if Offboard(origin | dest) == false {
+		b[dest] = b[origin]
+		b[origin] = nil
 	}
 }
 
@@ -45,7 +57,7 @@ func (b *Board) Print() {
 
 		// rank axis
 		for file := 0; file < 8; file++ {
-			fmt.Printf(" %c |", b.Position[Tile(rank, file)].Rune())
+			fmt.Printf(" %c |", b[Tile(rank, file)].Rune())
 		}
 
 		fmt.Println("\n  +---+---+---+---+---+---+---+---+")

@@ -34,3 +34,11 @@ func (p *Piece) Rune() rune {
 
 	return ' '
 }
+
+func (k Kind) Sliding() bool {
+	return int(k) & 1 != 0
+}
+
+func (c Color) Opponent() Color {
+	return Black - c
+}

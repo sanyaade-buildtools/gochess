@@ -6,8 +6,10 @@ import (
 )
 
 func main() {
-	b := chess.NewBoard()
+	g := new(chess.Game)
 
-	chess.PrintBoard(b)
-	fmt.Println(b.ValidMoves())
+	g.NewGame()
+	g.Board.Print()
+
+	fmt.Println(g.PseudoLegalMoves())
 }
