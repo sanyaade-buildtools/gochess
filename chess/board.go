@@ -36,6 +36,12 @@ func (b *Board) Setup() {
 	}
 }
 
+func (b *Board) Clear() {
+	for i := 0; i < 128; i++ {
+		b[i] = nil
+	}
+}
+
 func (b *Board) Place(tile int, color Color, kind Kind) {
 	if Offboard(tile) == false {
 		b[tile] = &Piece{Color: color, Kind: kind}

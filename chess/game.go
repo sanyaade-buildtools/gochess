@@ -8,6 +8,7 @@ type Game struct {
 	Castle int                // what castle moves are available
 	EnPassant int             // tile en passant can be performed into
 	HalfMove int              // pawn half moves
+	Start int                 // what move this game started from
 	Moves []Move              // all moves made
 }
 
@@ -38,15 +39,16 @@ var PieceDelta = [6][]int{
 	[]int{ -1, 1, -16, 16, -17, 15, -15, 17 },
 }
 
-func (g *Game) NewGame() {
-	g.Board.Setup()
+func (g *Game) Init() {
 	g.Turn = White
 	g.King[White] = Tile(0, 4)
 	g.King[Black] = Tile(7, 4)
 	g.Castle = 15
 	g.EnPassant = -1
 	g.HalfMove = 0
+	g.Start = 1
 	g.Moves = make([]Move, 0, 50)
+	g.Board.Setup()
 }
 
 func (g *Game) PerformMove(move Move) {

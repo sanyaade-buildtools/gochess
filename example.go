@@ -1,14 +1,17 @@
 package main
 
 import (
-	"./chess"
 	"fmt"
 )
 
-func main() {
-	g := new(chess.Game)
+import (
+//	"./chess"
+	"./fen"
+)
 
-	g.NewGame()
+func main() {
+	g := fen.Parse(fen.Start)
+
 	g.Board.Print()
 
 	fmt.Println(g.PseudoLegalMoves())
