@@ -49,6 +49,12 @@ func (b *Board) Move(origin, dest int) {
 	}
 }
 
+func (b *Board) Remove(tile int) {
+	if Offboard(tile) == false {
+		b[tile] = nil
+	}
+}
+
 func (b *Board) Print() {
 	fmt.Println("  +---+---+---+---+---+---+---+---+")
 
