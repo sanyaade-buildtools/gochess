@@ -2,7 +2,6 @@ package chess
 
 import "fmt"
 
-// 0x88 representation
 type Board [128]*Piece
 
 var BackRank = [2]int{ 0, 7 }

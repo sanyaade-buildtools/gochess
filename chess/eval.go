@@ -1,139 +1,31 @@
 package chess
 
-type Game struct {
-	Board Board               // 0x88 representation
-	Position [2]Position      // evaluation for each player
-	Turn Color                // white or black
-	Castle int                // what castle moves are available
-	EnPassant int             // tile en passant can be performed into
-	HalfMove int              // pawn half moves
-	Start int                 // what move this game started from
-	History []Move            // history of all moves made
-}
+const (
+	Kingside = iota
+	Queenside
+)
 
 type Position struct {
-	King int                  // location of player's king
+	King int                  // location of king
+	Castle [2]bool            // castle availability
 	Attack [128][]int         // attacking tiles
 	Moves []Move              // actual, legal moves
 	Score float32             // final score evaluation
 }
 
-type Move struct {
-	Origin, Dest int          // where it is moving from and to
-	Capture bool              // captured another piece
-	Castle int                // castle move: Kingside or Queenside
-	EnPassant bool            // was an en passant capture
-	Pawn, Push, Promote bool  // pawn move, 2 space push, promotion
-	Kind Kind                 // what was moved or promotion
-}
+func (pos *Position) Eval(b *Board, t Color) {
+	pos.Moves = make([]Move, 0, 30)
 
-// Game.Castle is a 4-bit nibble, where each 2 bits represents
-// the kingside and queenside availability. To get the bit value
-// for a given player = Side << (Color << 2)
+	for rank := 0; rank < 8; rank++ {
+		for file := 0; file < 8; file++ {
+			tile := Tile(rank, file)
 
-const (
-	Kingside = 1 + iota
-	Queenside
-)
-
-var PieceDelta = [6][]int{
-	[]int{ 16, -16 },
-	[]int{ -15, 15, -17, 17 },
-	[]int{ -31, -33, -14, 18, -18, 14, 31, 33 },
-	[]int{ -1, 1, -16, 16, -17, 15, -15, 17 },
-	[]int{ -1, 1, -16, 16 },
-	[]int{ -1, 1, -16, 16, -17, 15, -15, 17 },
-}
-
-func (g *Game) Init() {
-	g.Turn = White
-	g.Castle = 15
-	g.EnPassant = -1
-	g.HalfMove = 0
-	g.Start = 1
-	g.History = make([]Move, 0, 50)
-	g.Board.Setup()
-	g.Eval(White)
-	g.Eval(Black)
-}
-
-func (g *Game) PerformMove(move Move) {
-	if move.Castle != 0 {
-		g.PerformCastle(move.Castle)
-	} else {
-		g.Board.Move(move.Origin, move.Dest)
-
-		// pawn moves are special
-		if move.Pawn {
-			enPassant := move.Dest + PieceDelta[Pawn][g.Turn.Opponent()]
-
-			switch {
-				case move.EnPassant:
-					g.Board.Remove(enPassant)
-					break
-				case move.Push:
-					g.EnPassant = enPassant
-					break
-				case move.Promote:
-					g.Board.Place(move.Dest, g.Turn, move.Kind)
-					break
+			if p := (*b)[tile]; p != nil && p.Color == t {
+				if p.Kind == Pawn {
+					p.
 			}
 		}
-
-		// moving the rooks disables castling
-		switch move.Origin {
-			case Tile(BackRank[g.Turn], 0):
-				g.DisableCastle(Queenside)
-				break
-			case Tile(BackRank[g.Turn], 7):
-				g.DisableCastle(Kingside)
-				break
-		}
 	}
-
-	// update the king's position if moved
-	if move.Kind == King {
-		g.Position[g.Turn].King = move.Dest
-		g.DisableCastle(Kingside | Queenside)
-	}
-
-	// record the move and switch whose turn it is
-	g.History = append(g.History, move)
-	g.Turn = g.Turn.Opponent()
-
-	// update the half move counter
-	if move.Pawn == true {
-		g.HalfMove = 0
-	} else {
-		g.HalfMove++
-	}
-}
-
-func (g *Game) PerformCastle(castle int) {
-	rank := BackRank[g.Turn]
-
-	switch castle {
-		case Kingside:
-			g.Board.Move(Tile(rank, 4), Tile(rank, 6))
-			g.Board.Move(Tile(rank, 7), Tile(rank, 5))
-			break
-		case Queenside:
-			g.Board.Move(Tile(rank, 4), Tile(rank, 2))
-			g.Board.Move(Tile(rank, 0), Tile(rank, 3))
-			break
-	}
-
-	g.DisableCastle(Kingside | Queenside)
-}
-
-func (g *Game) DisableCastle(side int) {
-	g.Castle &= ^(side << uint(g.Turn << 2))
-}
-
-func (g *Game) Eval(t Color) {
-	pos := &g.Position[t]
-
-	// TODO:
 }
 
 func (g *Game) PseudoLegalMoves() []Move {
@@ -291,13 +183,4 @@ func (g *Game) CastleMoves() []Move {
 	}
 
 	return moves
-}
-
-func (g *Game) ContainsWinningMove(moves []Move) bool {
-	for _, move := range moves {
-		if move.Capture && g.Board[move.Dest].Kind == King {
-			return true
-		}
-	}
-	return false
 }
