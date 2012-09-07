@@ -2,7 +2,8 @@ package chess
 
 import "fmt"
 
-type Board [128]*Piece   // 0x88 representation
+// 0x88 representation
+type Board [128]*Piece
 
 var BackRank = [2]int{ 0, 7 }
 var PawnRank = [2]int{ 1, 6 }

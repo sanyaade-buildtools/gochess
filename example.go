@@ -7,6 +7,7 @@ import (
 import (
 //	"./chess"
 	"./fen"
+//	"./pgn"
 )
 
 func main() {
