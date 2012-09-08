@@ -11,9 +11,9 @@ import (
 )
 
 func main() {
-	g := fen.Parse(fen.Start)
+	pos := fen.Parse(fen.Start)
 
-	g.Board.Print()
+	pos.Board.Print()
 
-	fmt.Println(g.PseudoLegalMoves())
+	fmt.Println(pos.PseudoLegalMoves())
 }
