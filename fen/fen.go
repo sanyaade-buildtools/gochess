@@ -29,9 +29,6 @@ var PieceMap = map[rune]chess.Piece{
 func Parse(fen string) *chess.Position {
 	pos := new(chess.Position)
 
-	// initialize an empty position
-	pos.Init()
-
 	// divide the FEN into its components
 	sections := strings.Split(fen, " ")
 

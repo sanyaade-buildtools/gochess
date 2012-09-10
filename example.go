@@ -5,7 +5,7 @@ import (
 )
 
 import (
-//	"./chess"
+	"./chess"
 	"./fen"
 //	"./pgn"
 )
@@ -15,5 +15,6 @@ func main() {
 
 	pos.Board.Print()
 
-	fmt.Println(pos.PseudoLegalMoves())
+	moves := chess.Eval(pos, chess.White)
+	fmt.Println(len(moves))
 }

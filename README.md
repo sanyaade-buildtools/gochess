@@ -24,15 +24,22 @@ These can all be imported independently, although the `chess` package is used by
 
 # The `chess` Package
 
-The `chess` package is where most of your "chess" related work will actually be done. It is where the definitions for pieces, board positions, valid moves, castling, en passant, and current turn are.
+The `chess` package is where most of your "chess" related work will actually be done. It is where the definitions for pieces, board positions, valid moves, castling, en passant, and more are.
 
-## Creating a New Board
+## Creating a New Game
 
-Use the `chess.NewBoard` function to create a new `Board` with the correct position already setup.
+Use the `chess.Game` structure to hold any and all information about a game of chess. Simply call `NewGame()` one to get a brand new setup.
 
-	b := chess.NewBoard()
+	g := new(chess.Game)
+	g.NewGame()
 
-You can output a `Board` to stdout using the `chess.PrintBoard` function, which will display something like...
+## Displaying the Board
+
+Once you have a `Game` structure, you can print out the `Position` of it at any time using the `Render()` function in the `Board`.
+
+	g.Position.Board.Render()
+
+This will output a `Board` to `os.Stdout`, which will print something like...
 
 	  +---+---+---+---+---+---+---+---+
 	8 | r | n | b | q | k | b | n | r |
@@ -52,3 +59,4 @@ You can output a `Board` to stdout using the `chess.PrintBoard` function, which 
 	1 | R | N | B | Q | K | B | N | R |
 	  +---+---+---+---+---+---+---+---+
 	    a   b   c   d   e   f   g   h
+
