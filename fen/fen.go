@@ -75,7 +75,7 @@ func setBoard(g *chess.Game, setup string) bool {
 
 				// save the king locations
 				if p.Kind == chess.King {
-					g.Setup.King[p.Color] = tile
+					g.King[p.Color] = tile
 				}
 
 				// advance
@@ -94,8 +94,8 @@ func setBoard(g *chess.Game, setup string) bool {
 
 func setTurn(g *chess.Game, turn string) bool {
 	switch turn {
-		case "w", "W": g.Setup.Turn = chess.White; return true
-		case "b", "B": g.Setup.Turn = chess.Black; return true
+		case "w", "W": g.Turn = chess.White; return true
+		case "b", "B": g.Turn = chess.Black; return true
 	}
 
 	return false
@@ -109,16 +109,16 @@ func setCastle(g *chess.Game, castle string) bool {
 	for _, c := range castle {
 		switch c {
 			case 'K': 
-				g.Setup.Castles |= chess.Kingside << uint(chess.White << 2)
+				g.Castles |= chess.Kingside << uint(chess.White << 2)
 				break
 			case 'Q':
-				g.Setup.Castles |= chess.Queenside << uint(chess.White << 2)
+				g.Castles |= chess.Queenside << uint(chess.White << 2)
 				break
 			case 'k':
-				g.Setup.Castles |= chess.Kingside << uint(chess.Black << 2)
+				g.Castles |= chess.Kingside << uint(chess.Black << 2)
 				break
 			case 'q':
-				g.Setup.Castles |= chess.Queenside << uint(chess.Black << 2)
+				g.Castles |= chess.Queenside << uint(chess.Black << 2)
 				break
 
 			default:
@@ -131,7 +131,7 @@ func setCastle(g *chess.Game, castle string) bool {
 
 func setEnPassant(g *chess.Game, ep string) bool {
 	if ep == "-" {
-		g.Setup.EnPassant = -1
+		g.EnPassant = -1
 	} else {
 		if len(ep) != 2 {
 			return false
@@ -144,7 +144,7 @@ func setEnPassant(g *chess.Game, ep string) bool {
 			return false
 		}
 
-		g.Setup.EnPassant = chess.Tile(rank, file)
+		g.EnPassant = chess.Tile(rank, file)
 	}
 
 	return true
@@ -154,7 +154,7 @@ func setHalfMove(g *chess.Game, half string) bool {
 	n, err := strconv.Atoi(half)
 
 	if err == nil {
-		g.Setup.HalfMove = n
+		g.HalfMove = n
 	}
 
 	return err == nil
@@ -164,7 +164,7 @@ func setMove(g *chess.Game, move string) bool {
 	n, err := strconv.Atoi(move)
 
 	if err == nil {
-		g.Setup.Move = n
+		g.Move = n
 	}
 
 	return err == nil
