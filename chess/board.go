@@ -23,7 +23,13 @@ func Offboard(tile int) bool {
 	return tile & 0x88 != 0
 }
 
-func (b *Board) Setup() {
+func (b *Board) Clear() {
+	for i := 0; i < 128; i++ {
+		b[i] = nil
+	}
+}
+
+func (b *Board) New() {
 	backRow := [...]Kind{
 		Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook,
 	}
@@ -33,12 +39,6 @@ func (b *Board) Setup() {
 		b.Place(Tile(BackRank[Black], file), Black, backRow[file])
 		b.Place(Tile(PawnRank[White], file), White, Pawn)
 		b.Place(Tile(PawnRank[Black], file), Black, Pawn)
-	}
-}
-
-func (b *Board) Clear() {
-	for i := 0; i < 128; i++ {
-		b[i] = nil
 	}
 }
 
@@ -61,7 +61,7 @@ func (b *Board) Remove(tile int) {
 	}
 }
 
-func (b *Board) Print() {
+func (b *Board) Render() {
 	fmt.Println("  +---+---+---+---+---+---+---+---+")
 
 	for rank := 7; rank >= 0; rank-- {

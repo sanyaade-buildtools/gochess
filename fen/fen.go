@@ -26,8 +26,8 @@ var PieceMap = map[rune]chess.Piece{
 	'k': chess.Piece{Color: chess.Black, chess.Kind: chess.King},
 }
 
-func Parse(fen string) *chess.Position {
-	pos := new(chess.Position)
+func Parse(fen string) *chess.Game {
+	g := new(chess.Game)
 
 	// divide the FEN into its components
 	sections := strings.Split(fen, " ")
@@ -37,17 +37,17 @@ func Parse(fen string) *chess.Position {
 	}
 
 	// initialize each part of the game
-	if !setBoard(pos, sections[0]) { return nil }
-	if !setTurn(pos, sections[1]) { return nil }
-	if !setCastle(pos, sections[2]) { return nil }
-	if !setEnPassant(pos, sections[3]) { return nil }
-	if !setHalfMove(pos, sections[4]) { return nil }
-	if !setMove(pos, sections[5]) { return nil }
+	if !setBoard(g, sections[0]) { return nil }
+	if !setTurn(g, sections[1]) { return nil }
+	if !setCastle(g, sections[2]) { return nil }
+	if !setEnPassant(g, sections[3]) { return nil }
+	if !setHalfMove(g, sections[4]) { return nil }
+	if !setMove(g, sections[5]) { return nil }
 
-	return pos
+	return g
 }
 
-func setBoard(pos *chess.Position, setup string) bool {
+func setBoard(g *chess.Game, setup string) bool {
 	ranks := strings.Split(setup, "/")
 
 	// make sure there were 8 ranks of data
@@ -71,11 +71,11 @@ func setBoard(pos *chess.Position, setup string) bool {
 				}
 
 				// put the piece onto the board
-				pos.Board.Place(tile, p.Color, p.Kind)
+				g.Position.Place(tile, p.Color, p.Kind)
 
 				// save the king locations
 				if p.Kind == chess.King {
-					pos.King[p.Color] = tile
+					g.Setup.King[p.Color] = tile
 				}
 
 				// advance
@@ -92,16 +92,16 @@ func setBoard(pos *chess.Position, setup string) bool {
 	return true
 }
 
-func setTurn(pos *chess.Position, turn string) bool {
+func setTurn(g *chess.Game, turn string) bool {
 	switch turn {
-		case "w", "W": pos.Turn = chess.White; return true
-		case "b", "B": pos.Turn = chess.Black; return true
+		case "w", "W": g.Setup.Turn = chess.White; return true
+		case "b", "B": g.Setup.Turn = chess.Black; return true
 	}
 
 	return false
 }
 
-func setCastle(pos *chess.Position, castle string) bool {
+func setCastle(g *chess.Game, castle string) bool {
 	if castle == "-" {
 		return true
 	}
@@ -109,16 +109,16 @@ func setCastle(pos *chess.Position, castle string) bool {
 	for _, c := range castle {
 		switch c {
 			case 'K': 
-				pos.Castles |= chess.Kingside << uint(chess.White << 2)
+				g.Setup.Castles |= chess.Kingside << uint(chess.White << 2)
 				break
 			case 'Q':
-				pos.Castles |= chess.Queenside << uint(chess.White << 2)
+				g.Setup.Castles |= chess.Queenside << uint(chess.White << 2)
 				break
 			case 'k':
-				pos.Castles |= chess.Kingside << uint(chess.Black << 2)
+				g.Setup.Castles |= chess.Kingside << uint(chess.Black << 2)
 				break
 			case 'q':
-				pos.Castles |= chess.Queenside << uint(chess.Black << 2)
+				g.Setup.Castles |= chess.Queenside << uint(chess.Black << 2)
 				break
 
 			default:
@@ -129,9 +129,9 @@ func setCastle(pos *chess.Position, castle string) bool {
 	return true
 }
 
-func setEnPassant(pos *chess.Position, ep string) bool {
+func setEnPassant(g *chess.Game, ep string) bool {
 	if ep == "-" {
-		pos.EnPassant = -1
+		g.Setup.EnPassant = -1
 	} else {
 		if len(ep) != 2 {
 			return false
@@ -144,27 +144,27 @@ func setEnPassant(pos *chess.Position, ep string) bool {
 			return false
 		}
 
-		pos.EnPassant = chess.Tile(rank, file)
+		g.Setup.EnPassant = chess.Tile(rank, file)
 	}
 
 	return true
 }
 
-func setHalfMove(pos *chess.Position, half string) bool {
+func setHalfMove(g *chess.Game, half string) bool {
 	n, err := strconv.Atoi(half)
 
 	if err == nil {
-		pos.HalfMove = n
+		g.Setup.HalfMove = n
 	}
 
 	return err == nil
 }
 
-func setMove(pos *chess.Position, move string) bool {
+func setMove(g *chess.Game, move string) bool {
 	n, err := strconv.Atoi(move)
 
 	if err == nil {
-		pos.Start = n
+		g.Setup.Move = n
 	}
 
 	return err == nil

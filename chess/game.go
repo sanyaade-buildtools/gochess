@@ -1,11 +1,13 @@
 package chess
 
+import "fmt"
+
 const (
 	Kingside = 1 + iota
 	Queenside
 )
 
-type State struct {
+type Setup struct {
 	Turn Color                // whose turn it is
 	King [2]int               // location of king pieces
 	EnPassant int             // en passant availability
@@ -16,7 +18,7 @@ type State struct {
 
 type Game struct {
 	Position Board            // 0x88 board representation
-	State State               // current game state
+	Setup Setup               // current game state
 }
 
 type Move struct {
@@ -29,34 +31,32 @@ type Move struct {
 }
 
 type Undo struct {
-	State State               // game state copy
-	Piece *Piece              // destination piece (if captured)
+	Setup Setup               // game state copy
+	Capture *Piece            // destination piece (if captured)
 	Move *Move                // the move that was performed
 }
 
-func (m *Move) IsAttack() bool {
-	return m.Castle == 0 && (m.Pawn == false || m.Capture == true)
+func (g *Game) New() {
+	g.Position.New()
+
+	// initial state for a new game
+	g.Setup.Turn = White
+	g.Setup.King[White] = Tile(0, 4)
+	g.Setup.King[Black] = Tile(7, 4)
+	g.Setup.EnPassant = -1
+	g.Setup.Castles = 15
+	g.Setup.HalfMove = 0
+	g.Setup.Move = 1
 }
 
-func (pos *Position) Setup() {
-	pos.Turn = White
-	pos.Board.Setup()
-	pos.King[White] = Tile(0, 4)
-	pos.King[Black] = Tile(7, 4)
-	pos.EnPassant = -1
-	pos.Castles = 15
-	pos.HalfMove = 0
-	pos.Start = 1
-}
-
-func (pos *Position) Eval() []*Move {
+func (g *Game) Moves() []*Move {
 	moves := make([]*Move, 0, 30)
 	c := make(chan *Move)
 
-	go pos.PseudoLegalMoves(c)
+	go g.PseudoLegalMoves(c)
 
 	for move := range c {
-		if pos.IsLegalMove(move) {
+		if g.IsLegalMove(move) {
 			moves = append(moves, move)
 		}
 	}
@@ -64,44 +64,52 @@ func (pos *Position) Eval() []*Move {
 	return moves
 }
 
-func (pos *Position) IsLegalMove(move *Move) bool {
-	turn := pos.Turn
-	undo := pos.PerformMove(move)
+func (g *Game) IsLegalMove(move *Move) bool {
+	if p := g.Position[move.Origin]; p == nil || p.Color != g.Setup.Turn {
+		return false
+	}
+
+	// try making the move, which will update the position
+	undo := g.PerformMove(move)
 
 	// always make sure to undo the move
-	defer pos.PerformUndo(undo)
+	defer g.PerformUndo(undo)
 
+	// cannot castle through (or out of) check
 	switch move.Castle {
 		case Kingside:
 			for x := move.Origin; x < move.Dest; x++ {
-				if pos.IsAttacked(x) { return false }
+				if g.IsAttacked(x) { return false }
 			}
 			break
 		case Queenside:
 			for x := move.Origin; x > move.Dest; x-- {
-				if pos.IsAttacked(x) { return false }
+				if g.IsAttacked(x) { return false }
 			}
 			break
 	}
 
-	return pos.IsAttacked(pos.King[turn]) == false
+	// cannot be in check after the move
+	return true //g.IsAttacked(g.Setup.King[g.Setup.Turn]) == false
 }
 
-func (pos *Position) IsAttacked(tile int) bool {
-	piece := pos.Board[tile]
+func (g *Game) IsAttacked(tile int) bool {
+	piece := g.Position[tile]
 	t := piece.Color
 	opp := t.Opponent()
 
 	// check pawn attacks to the left
-	if l := tile + PieceDelta[Pawn][opp] - 1; Offboard(l) == false {
-		if p := pos.Board[l]; p != nil && p.Color != t {
+	if l := tile - PieceDelta[Pawn][opp] - 1; Offboard(l) == false {
+		if p := g.Position[l]; p != nil && p.Color == opp {
+			fmt.Println("a")
 			return true
 		}
 	}
 
 	// check pawn attack to the right
-	if r := tile + PieceDelta[Pawn][opp] + 1; Offboard(r) == false {
-		if p := pos.Board[r]; p != nil && p.Color != t {
+	if r := tile - PieceDelta[Pawn][opp] + 1; Offboard(r) == false {
+		if p := g.Position[r]; p != nil && p.Color == opp {
+			fmt.Println("b")
 			return true
 		}
 	}
@@ -113,8 +121,9 @@ func (pos *Position) IsAttacked(tile int) bool {
 
 			// sliding pieces keep moving along that direction
 			for x := tile + d; capture || Offboard(x) == false; x += d {
-				if p := pos.Board[x]; p != nil {
+				if p := g.Position[x]; p != nil {
 					if p.Color != t {
+			fmt.Println("c")
 						return true
 					}
 					break
@@ -127,39 +136,40 @@ func (pos *Position) IsAttacked(tile int) bool {
 		}
 	}
 
+			fmt.Println("d")
 	return false
 }
 
-func (pos *Position) PseudoLegalMoves(ch chan *Move) {
+func (g *Game) PseudoLegalMoves(ch chan *Move) {
 	for rank := 0; rank < 8; rank++ {
 		for file := 0; file < 8; file++ {
 			tile := Tile(rank, file)
 
 			// find moves for pieces matching the color
-			if p := pos.Board[tile]; p != nil && p.Color == pos.Turn {
+			if p := g.Position[tile]; p != nil && p.Color == g.Setup.Turn {
 				if p.Kind == Pawn {
-					pos.PawnMoves(ch, tile)
+					g.PawnMoves(ch, tile)
 				} else {
-					pos.NonPawnMoves(ch, tile, p.Kind)
+					g.NonPawnMoves(ch, tile, p.Kind)
 				}
 			}
 		}
 	}
 
 	// get available castle moves
-	pos.CastleMoves(ch)
+	g.CastleMoves(ch)
 
 	// done collecting moves
 	close(ch)
 }
 
-func (pos *Position) PawnMoves(ch chan *Move, tile int) {
-	d := PieceDelta[Pawn][pos.Turn]
-	back := BackRank[pos.Turn.Opponent()]
+func (g *Game) PawnMoves(ch chan *Move, tile int) {
+	d := PieceDelta[Pawn][g.Setup.Turn]
+	back := BackRank[g.Setup.Turn.Opponent()]
 	x := tile + d
 
 	// advance forward once (can't be off board)
-	if pos.Board[x] == nil {
+	if g.Position[x] == nil {
 		ch <- &Move{
 			Origin: tile,
 			Dest: x,
@@ -168,8 +178,8 @@ func (pos *Position) PawnMoves(ch chan *Move, tile int) {
 		}
 
 		// try pushing the pawn?
-		if Rank(tile) == PawnRank[pos.Turn] {
-			if pos.Board[x + d] == nil {
+		if Rank(tile) == PawnRank[g.Setup.Turn] {
+			if g.Position[x + d] == nil {
 				ch <- &Move{
 					Origin: tile,
 					Dest: x + d,
@@ -187,7 +197,7 @@ func (pos *Position) PawnMoves(ch chan *Move, tile int) {
 		}
 
 		// en passant capture?
-		if tile + d + i == pos.EnPassant {
+		if tile + d + i == g.Setup.EnPassant {
 			ch <- &Move{
 				Origin: tile,
 				Dest: x + i,
@@ -196,9 +206,9 @@ func (pos *Position) PawnMoves(ch chan *Move, tile int) {
 				EnPassant: true,
 			}
 		} else {
-			p := pos.Board[x + i]
+			p := g.Position[x + i]
 
-			if p != nil && p.Color != pos.Turn {
+			if p != nil && p.Color != g.Setup.Turn {
 				ch <- &Move{
 					Origin: tile,
 					Dest: x + i,
@@ -211,14 +221,14 @@ func (pos *Position) PawnMoves(ch chan *Move, tile int) {
 	}
 }
 
-func (pos *Position) NonPawnMoves(ch chan *Move, tile int, kind Kind) {
+func (g *Game) NonPawnMoves(ch chan *Move, tile int, kind Kind) {
 	for _, d := range PieceDelta[kind] {
 		capture := false
 
 		// sliding pieces keep moving along that direction
 		for x := tile + d; capture || Offboard(x) == false; x += d {
-			if p := pos.Board[x]; p != nil {
-				if p.Color != pos.Turn {
+			if p := g.Position[x]; p != nil {
+				if p.Color != g.Setup.Turn {
 					capture = true
 				} else {
 					break
@@ -239,13 +249,13 @@ func (pos *Position) NonPawnMoves(ch chan *Move, tile int, kind Kind) {
 	}
 }
 
-func (pos *Position) CastleMoves(ch chan *Move) {
-	tile := Tile(BackRank[pos.Turn], 4)
+func (g *Game) CastleMoves(ch chan *Move) {
+	tile := Tile(BackRank[g.Setup.Turn], 4)
 
 	// is the kingside castle available?
-	if pos.Castles & (Kingside << uint(pos.Turn << 2)) != 0 {
-		b := pos.Board[tile + 1] == nil
-		n := pos.Board[tile + 2] == nil
+	if g.Setup.Castles & (Kingside << uint(g.Setup.Turn << 2)) != 0 {
+		b := g.Position[tile + 1] == nil
+		n := g.Position[tile + 2] == nil
 
 		if b && n /* bishop and knight */ {
 			ch <- &Move{
@@ -258,10 +268,10 @@ func (pos *Position) CastleMoves(ch chan *Move) {
 	}
 
 	// is the queenside castle available?
-	if pos.Castles & (Queenside << uint(pos.Turn << 2)) != 0 {
-		q := pos.Board[tile - 1] == nil
-		b := pos.Board[tile - 2] == nil
-		n := pos.Board[tile - 3] == nil
+	if g.Setup.Castles & (Queenside << uint(g.Setup.Turn << 2)) != 0 {
+		q := g.Position[tile - 1] == nil
+		b := g.Position[tile - 2] == nil
+		n := g.Position[tile - 3] == nil
 
 		if q && b && n /* queen, bishop, knight */ {
 			ch <- &Move{
@@ -273,90 +283,104 @@ func (pos *Position) CastleMoves(ch chan *Move) {
 		}
 	}
 }
-func (pos *Position) PerformMove(move *Move) *Undo {
-	undo := &Undo{}
+func (g *Game) PerformMove(move *Move) *Undo {
+	var capture *Piece
 
+	// en passant is unavailable after every move
+	g.Setup.EnPassant = -1
+
+	// check for a castle move
 	if move.Castle != 0 {
-		rank := BackRank[pos.Turn]
+		rank := BackRank[g.Setup.Turn]
 
 		switch move.Castle {
 			case Kingside:
-				pos.Board.Move(Tile(rank, 4), Tile(rank, 6))
-				pos.Board.Move(Tile(rank, 7), Tile(rank, 5))
+				g.Position.Move(Tile(rank, 4), Tile(rank, 6))
+				g.Position.Move(Tile(rank, 7), Tile(rank, 5))
 				break
 			case Queenside:
-				pos.Board.Move(Tile(rank, 4), Tile(rank, 2))
-				pos.Board.Move(Tile(rank, 0), Tile(rank, 3))
+				g.Position.Move(Tile(rank, 4), Tile(rank, 2))
+				g.Position.Move(Tile(rank, 0), Tile(rank, 3))
 				break
 		}
 
-		pos.DisableCastle(Kingside | Queenside)
+		// performing castle means disabling castling
+		g.DisableCastle(Kingside | Queenside)
 	} else {
-		pos.Board.Move(move.Origin, move.Dest)
+		if move.Capture {
+			capture = g.Position[move.Dest]
+		}
+
+		// move the piece to the new position
+		g.Position.Move(move.Origin, move.Dest)
 
 		// pawn moves are special
 		if move.Pawn {
-			enPassant := move.Dest + PieceDelta[Pawn][pos.Turn.Opponent()]
+			enPassant := move.Dest + PieceDelta[Pawn][g.Setup.Turn.Opponent()]
 
 			switch {
 				case move.EnPassant:
-					pos.Board.Remove(enPassant)
+					g.Position.Remove(enPassant)
 					break
 				case move.Push:
-					pos.EnPassant = enPassant
+					g.Setup.EnPassant = enPassant
 					break
 				case move.Promote:
-					pos.Board.Place(move.Dest, pos.Turn, move.Kind)
+					g.Position.Place(move.Dest, g.Setup.Turn, move.Kind)
 					break
 			}
 		}
 
 		// moving the rooks disables castling
 		switch move.Origin {
-			case Tile(BackRank[pos.Turn], 0):
-				pos.DisableCastle(Queenside)
+			case Tile(BackRank[g.Setup.Turn], 0):
+				g.DisableCastle(Queenside)
 				break
-			case Tile(BackRank[pos.Turn], 7):
-				pos.DisableCastle(Kingside)
+			case Tile(BackRank[g.Setup.Turn], 7):
+				g.DisableCastle(Kingside)
 				break
 		}
 	}
 
 	// update the king's position if moved
 	if move.Kind == King {
-		pos.King[pos.Turn] = move.Dest
-		pos.DisableCastle(Kingside | Queenside)
+		g.Setup.King[g.Setup.Turn] = move.Dest
+
+		// moving the king disabled all castling
+		g.DisableCastle(Kingside | Queenside)
 	}
 
 	// record the move and switch whose turn it is
-	pos.Turn = pos.Turn.Opponent()
+	if g.Setup.Turn = g.Setup.Turn.Opponent(); g.Setup.Turn == White {
+		g.Setup.Move++
+	}
 
 	// update the half move counter
 	if move.Pawn == true {
-		pos.HalfMove = 0
+		g.Setup.HalfMove = 0
 	} else {
-		pos.HalfMove++
+		g.Setup.HalfMove++
 	}
 
-	return undo
+	return &Undo{
+		Setup: g.Setup,
+		Capture: capture,
+		Move: move,
+	}
 }
 
-func (pos *Position) PerformCastle(castle int) {
+func (g *Game) DisableCastle(side int) {
+	g.Setup.Castles &= ^(side << uint(g.Setup.Turn << 2))
 }
 
-func (pos *Position) DisableCastle(side int) {
-	pos.Castles &= ^(side << uint(pos.Turn << 2))
-}
-
-func (pos *Position) PerformUndo(undo *Undo) {
+func (g *Game) PerformUndo(undo *Undo) {
 	if undo.Move.Castle != 0 {
 		// TODO:
 	} else {
-		if undo.Move.Promote {
-			pos.Board.Place(undo.Move.Origin, undo.Turn, Pawn)
-		} else {
-			pos.Board.Move(undo.Move.Dest, undo.Move.Origin)
-			pos.Board[undo.Move.Dest] = undo.Piece
-		}
+		g.Position.Move(undo.Move.Dest, undo.Move.Origin)
+		g.Position[undo.Move.Dest] = undo.Capture
 	}
+
+	// restore to the previous state
+	g.Setup = undo.Setup
 }

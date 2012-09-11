@@ -5,16 +5,16 @@ import (
 )
 
 import (
-	"./chess"
+//	"./chess"
 	"./fen"
 //	"./pgn"
 )
 
 func main() {
-	pos := fen.Parse(fen.Start)
+	g := fen.Parse(fen.Start)
 
-	pos.Board.Print()
+	g.Position.Render()
 
-	moves := chess.Eval(pos, chess.White)
+	moves := g.Moves()
 	fmt.Println(len(moves))
 }
