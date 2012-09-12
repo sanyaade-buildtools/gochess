@@ -15,8 +15,7 @@ func main() {
 
 	g.Position.Render()
 
-	pseudoMoves := g.PseudoLegalMoves()
-	moves := g.LegalMoves(pseudoMoves)
+	moves := g.LegalMoves()
 
 	fmt.Println(len(moves))
 }

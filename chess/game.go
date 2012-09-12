@@ -10,20 +10,6 @@ type Game struct {
 	Move int                  // current full move
 }
 
-type Move struct {
-	Origin, Dest int          // where it is moving from and to
-	Capture bool              // captured another piece
-	Castle int                // castle move: Kingside or Queenside
-	EnPassant bool            // was an en passant capture
-	Pawn, Push, Promote bool  // pawn move, 2 space push, promotion
-	Kind Kind                 // what was moved or promotion
-}
-
-const (
-	Kingside = 1 + iota
-	Queenside
-)
-
 func (g *Game) New() {
 	g.Position.New()
 
@@ -35,6 +21,126 @@ func (g *Game) New() {
 	g.Castles = 15
 	g.HalfMove = 0
 	g.Move = 1
+}
+
+func (g *Game) LegalMoves() []*Move {
+	moves := make([]*Move, 0, 30)
+	c := g.PseudoLegalMoves()
+
+	// collect all pseudo-legal moves that are 100% legal
+	for move := range c {
+		if g.IsLegalMove(move) {
+			moves = append(moves, move)
+		}
+	}
+
+	return moves
+}
+
+func (g *Game) PseudoLegalMoves() chan *Move {
+	c := make(chan *Move, 60)
+
+	go func() {
+		for rank := 0; rank < 8; rank++ {
+			for file := 0; file < 8; file++ {
+				tile := Tile(rank, file)
+
+				// find moves for pieces matching the color
+				if p := g.Position[tile]; p != nil && p.Color == g.Turn {
+					if p.Kind == Pawn {
+						pawnMoves(c, g, tile)
+					} else {
+						nonPawnMoves(c, g, tile, p.Kind)
+					}
+				}
+			}
+		}
+
+		// get available castle moves
+		castleMoves(c, g)
+
+		// done collecting moves
+		close(c)
+	}()
+
+	return c
+}
+
+func (g *Game) IsLegalMove(move *Move) bool {
+	if Offboard(move.Origin) || Offboard(move.Dest) {
+		return false
+	}
+
+	p := g.Position[move.Origin]
+	x := g.Position[move.Dest]
+
+	// the piece exists and is owned by the current player
+	if p == nil || p.Color != g.Turn {
+		return false
+	}
+
+	if move.Castle != 0 {
+		d := 1
+
+		// make sure the castle move is available
+		if g.Castles & (move.Castle << uint(g.Turn << 2)) == 0 {
+			return false
+		}
+
+		// queenside castles move down in file
+		if move.Castle != Kingside {
+			d = -d
+		}
+
+		// cannot move through check
+		for i := 0; i < 3; i++ {
+			
+			if g.InCheck(g.King[g.Turn] + i * d) {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	if move.Pawn {
+		if p.Kind != Pawn {
+			return false
+		}
+
+		// can only push pawns on the pawn rank
+		if move.Push && Rank(move.Origin) != PawnRank[g.Turn] {
+			return false
+		}
+
+		// make sure en passant is valid
+		if move.EnPassant && move.Dest != g.EnPassant {
+			return false
+		}
+	}
+
+	// undo
+	defer func() {
+		g.Position[move.Origin] = p
+		g.Position[move.Dest] = x
+	}()
+
+	// make move
+	g.Position[move.Origin] = nil
+	g.Position[move.Dest] = p
+
+	// verify (if the king moved) it isn't in check
+	if move.Origin == g.King[g.Turn] {
+		return g.InCheck(move.Dest) == false
+	}
+
+	// verify the king isn't in check
+	return g.InCheck(g.King[g.Turn]) == false
+}
+
+func (g *Game) InCheck(tile int) bool {
+
+	return false
 }
 
 func (g *Game) PerformMove(move *Move) {

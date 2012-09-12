@@ -1,50 +1,50 @@
 package chess
 
-func (g *Game) LegalMoves(pseudoMoves chan *Move) chan *Move {
-	c := make(chan *Move, 60)
-
-	go func() {
-		for move := range pseudoMoves {
-			c <- move // TODO: validate the move is 100% legal
-		}
-
-		// now have full set of moves
-		close(c)
-	}()
-
-	return c
+type Move struct {
+	Origin, Dest int          // where it is moving from and to
+	Capture bool              // captured another piece
+	Castle int                // castle move: Kingside or Queenside
+	EnPassant bool            // was an en passant capture
+	Pawn, Push, Promote bool  // pawn move, 2 space push, promotion
+	Kind Kind                 // what was moved or promotion
 }
 
-func (g *Game) PseudoLegalMoves() chan *Move {
-	c := make(chan *Move, 60)
+type MoveList chan *Move     // scatter-gathering of moves
 
-	go func() {
-		for rank := 0; rank < 8; rank++ {
-			for file := 0; file < 8; file++ {
-				tile := Tile(rank, file)
+const (
+	Kingside = 1 + iota
+	Queenside
+)
 
-				// find moves for pieces matching the color
-				if p := g.Position[tile]; p != nil && p.Color == g.Turn {
-					if p.Kind == Pawn {
-						pawnMoves(c, g, tile)
-					} else {
-						nonPawnMoves(c, g, tile, p.Kind)
-					}
-				}
+func (moves *MoveList) Collect(pos *Position, turn Color) {
+	for rank := 0; rank < 8; rank++ {
+		for file := 0; file < 8; file++ {
+			tile := Tile(rank, file)
+
+			if p := pos[tile]; p != nil && p.Color == turn {
+				moves.CollectPawnMoves(pos, tile, turn)
+			} else {
+				moves.CollectNonPawnMoves(pos, tile, turn, p.Kind)
 			}
 		}
-
-		// get available castle moves
-		castleMoves(c, g)
-
-		// done collecting moves
-		close(c)
-	}()
-
-	return c
+	}
 }
 
-func pawnMoves(c chan *Move, g *Game, tile int) {
+func (moves MoveList) PieceMoves(g *Game, tile int) {
+	if Offboard(tile) == false {
+		if p := g.Position[tile]; p != nil {
+			if p.Kind == Pawn {
+				moves.PawnMoves(g, tile)
+			} else {
+				moves.NonPawnMoves(g, tile)
+			}
+		}
+	}
+}
+
+func (moves MoveList) PawnMoves(g *Game, tile int) {
+	
+
 	d := PieceDelta[Pawn][g.Turn]
 	back := BackRank[g.Turn.Opponent()]
 	x := tile + d
