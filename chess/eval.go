@@ -1,51 +1,25 @@
 package chess
 
-// these are all the methods that each side can use to attack with
-var AttackTable = [2]map[int][][]int{
-	map[int][][]int{
-		(1 << uint(Bishop)) | (1 << uint(Queen)): [][]int{
-			[]int{ 15, 30, 45, 60, 75, 90, 105 }, // up left
-			[]int{ 17, 34, 51, 68, 85, 102, 119 }, // up right
-			[]int{ -15, -30, -45, -60, -75, -90, -105 }, // down left
-			[]int{ -17, -34, -51, -68, -85, -102, -119 }, // down right
-		},
-		(1 << uint(Rook)) | (1 << uint(Queen)): [][]int{
-			[]int{ 16, 32, 48, 64, 80, 96, 112 }, // up
-			[]int{ 1, 2, 3, 4, 5, 6, 7 }, // right
-			[]int{ -16, -32, -48, -64, -80, -96, -112 }, // down
-			[]int{ -1, -2, -3, -4, -5, -6, -7 }, // left
-		},
-		(1 << uint(Knight)): [][]int{ PieceDelta[Knight] },
-		(1 << uint(King)): [][]int{ PieceDelta[King] },
-		(1 << uint(Pawn)): [][]int{
-			[]int{ 
-				PieceDelta[Pawn][White] - 1,
-				PieceDelta[Pawn][White] + 1,
-			},
-		},
+var PawnAttackTable = [2][]int{
+	[]int{ -15, -17 },
+	[]int{ 15, 17 },
+}
+
+var AttackTable = map[int][][]int{
+	(1 << uint(Bishop)) | (1 << uint(Queen)): [][]int{
+		[]int{ 15, 30, 45, 60, 75, 90, 105 }, // up left
+		[]int{ 17, 34, 51, 68, 85, 102, 119 }, // up right
+		[]int{ -15, -30, -45, -60, -75, -90, -105 }, // down left
+		[]int{ -17, -34, -51, -68, -85, -102, -119 }, // down right
 	},
-	map[int][][]int{
-		(1 << uint(Bishop)) | (1 << uint(Queen)): [][]int{
-			[]int{ 15, 30, 45, 60, 75, 90, 105 }, // up left
-			[]int{ 17, 34, 51, 68, 85, 102, 119 }, // up right
-			[]int{ -15, -30, -45, -60, -75, -90, -105 }, // down left
-			[]int{ -17, -34, -51, -68, -85, -102, -119 }, // down right
-		},
-		(1 << uint(Rook)) | (1 << uint(Queen)): [][]int{
-			[]int{ 16, 32, 48, 64, 80, 96, 112 }, // up
-			[]int{ 1, 2, 3, 4, 5, 6, 7 }, // right
-			[]int{ -16, -32, -48, -64, -80, -96, -112 }, // down
-			[]int{ -1, -2, -3, -4, -5, -6, -7 }, // left
-		},
-		(1 << uint(Knight)): [][]int{ PieceDelta[Knight] },
-		(1 << uint(King)): [][]int{ PieceDelta[King] },
-		(1 << uint(Pawn)): [][]int{
-			[]int{ 
-				PieceDelta[Pawn][Black] - 1,
-				PieceDelta[Pawn][Black] + 1,
-			},
-		},
+	(1 << uint(Rook)) | (1 << uint(Queen)): [][]int{
+		[]int{ 16, 32, 48, 64, 80, 96, 112 }, // up
+		[]int{ 1, 2, 3, 4, 5, 6, 7 }, // right
+		[]int{ -16, -32, -48, -64, -80, -96, -112 }, // down
+		[]int{ -1, -2, -3, -4, -5, -6, -7 }, // left
 	},
+	(1 << uint(Knight)): [][]int{ PieceDelta[Knight] },
+	(1 << uint(King)): [][]int{ PieceDelta[King] },
 }
 
 func (g *Game) IsLegalMove(move *Move) bool {
@@ -120,24 +94,27 @@ func (g *Game) IsLegalMove(move *Move) bool {
 }
 
 func (g *Game) InCheck(tile int) bool {
-	for pieces, attacks := range AttackTable[g.Turn.Opponent()] {
+	opp := g.Turn.Opponent()
+
+	// check for simple pawn attacks
+	for delta := range PawnAttackTable[opp] {
+		if p := g.Position.Piece(tile + delta); p != nil {
+			if p.Color == g.Turn.Opponent() && p.Kind == Pawn {
+				return true
+			}
+		}
+	}
+
+	// non-pawn attacking pieces
+	for pieces, attacks := range AttackTable {
 		for _, direction := range attacks {
 			for _, delta := range direction {
-				if Offboard(tile + delta) {
-					break
-				}
-
-				// check to see if a piece is there
-				if p := g.Position[tile]; p != nil {
-					bit := 1 << uint(p.Kind)
-
-					// my piece or wrong piece
-					if p.Color == g.Turn  || (pieces & bit == 0) {
-						break
+				if p := g.Position.Piece(tile + delta); p != nil {
+					if pieces & (1 << uint(p.Kind)) != 0 {
+						if p.Color == opp {
+							return true
+						}
 					}
-
-					// enenmy piece of the right type
-					return true
 				}
 			}
 		}
@@ -246,7 +223,7 @@ func (g *Game) NonPawnMoves(ch chan *Move, tile int, kind Kind) {
 
 		// sliding pieces keep moving along that direction
 		for x := tile + d; capture || Offboard(x) == false; x += d {
-			if p := g.Position[x]; p != nil {
+			if p := g.Position.Piece(x); p != nil {
 				if p.Color != g.Turn {
 					capture = true
 				} else {
@@ -273,8 +250,8 @@ func (g *Game) CastleMoves(ch chan *Move) {
 
 	// is the kingside castle available?
 	if g.Castles & (Kingside << uint(g.Turn << 2)) != 0 {
-		b := g.Position[tile + 1] == nil
-		n := g.Position[tile + 2] == nil
+		b := g.Position.Piece(tile + 1) == nil
+		n := g.Position.Piece(tile + 2) == nil
 
 		if b && n /* bishop and knight */ {
 			ch <- &Move{
@@ -288,9 +265,9 @@ func (g *Game) CastleMoves(ch chan *Move) {
 
 	// is the queenside castle available?
 	if g.Castles & (Queenside << uint(g.Turn << 2)) != 0 {
-		q := g.Position[tile - 1] == nil
-		b := g.Position[tile - 2] == nil
-		n := g.Position[tile - 3] == nil
+		q := g.Position.Piece(tile - 1) == nil
+		b := g.Position.Piece(tile - 2) == nil
+		n := g.Position.Piece(tile - 3) == nil
 
 		if q && b && n /* queen, bishop, knight */ {
 			ch <- &Move{

@@ -48,6 +48,13 @@ func (b *Board) Place(tile int, color Color, kind Kind) {
 	}
 }
 
+func (b *Board) Piece(tile int) *Piece {
+	if Offboard(tile) == false {
+		return b[tile]
+	}
+	return nil
+}
+
 func (b *Board) Move(origin, dest int) {
 	if Offboard(origin | dest) == false {
 		b[dest] = b[origin]
