@@ -5,21 +5,28 @@ var PawnAttackTable = [2][]int{
 	[]int{ 15, 17 },
 }
 
+const (
+	Attack_BQ = (1 << uint(Bishop)) | (1 << uint(Queen))
+	Attack_RQ = (1 << uint(Rook)) | (1 << uint(Queen))
+	Attack_N  = (1 << uint(Knight))
+	Attack_K  = (1 << uint(King))
+)
+
 var AttackTable = map[int][][]int{
-	(1 << uint(Bishop)) | (1 << uint(Queen)): [][]int{
+	Attack_BQ: [][]int{
 		[]int{ 15, 30, 45, 60, 75, 90, 105 }, // up left
 		[]int{ 17, 34, 51, 68, 85, 102, 119 }, // up right
 		[]int{ -15, -30, -45, -60, -75, -90, -105 }, // down left
 		[]int{ -17, -34, -51, -68, -85, -102, -119 }, // down right
 	},
-	(1 << uint(Rook)) | (1 << uint(Queen)): [][]int{
+	Attack_RQ: [][]int{
 		[]int{ 16, 32, 48, 64, 80, 96, 112 }, // up
 		[]int{ 1, 2, 3, 4, 5, 6, 7 }, // right
 		[]int{ -16, -32, -48, -64, -80, -96, -112 }, // down
 		[]int{ -1, -2, -3, -4, -5, -6, -7 }, // left
 	},
-	(1 << uint(Knight)): [][]int{ PieceDelta[Knight] },
-	(1 << uint(King)): [][]int{ PieceDelta[King] },
+	Attack_N: [][]int{ PieceDelta[Knight] },
+	Attack_K: [][]int{ PieceDelta[King] },
 }
 
 func (g *Game) IsLegalMove(move *Move) bool {
