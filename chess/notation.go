@@ -31,3 +31,9 @@ func (move *Move) LongNotation() string {
 
 	return fmt.Sprintf("%c%s%c%s", piece, origin, x, dest)
 }
+
+func (move *Move) Parse(notation string) bool {
+	
+
+	return true
+}

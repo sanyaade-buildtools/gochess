@@ -14,9 +14,9 @@ type Move struct {
 	Origin, Dest int          // where it is moving from and to
 	Capture bool              // captured another piece
 	Castle int                // castle move: Kingside or Queenside
+	Check int                 // check and/or mate
 	EnPassant bool            // was an en passant capture
 	Pawn, Push, Promote bool  // pawn move, 2 space push, promotion
-	Check bool                // true if it puts enemy in check
 	Kind Kind                 // what was moved or promotion
 }
 
@@ -27,6 +27,11 @@ type Move struct {
 const (
 	Kingside = 1 + iota
 	Queenside
+)
+
+const (
+	Check = 1 + iota
+	Mate
 )
 
 func (g *Game) New() {
