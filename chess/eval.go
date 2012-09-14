@@ -1,5 +1,53 @@
 package chess
 
+// these are all the methods that each side can use to attack with
+var AttackTable = [2]map[int][][]int{
+	map[int][][]int{
+		(1 << uint(Bishop)) | (1 << uint(Queen)): [][]int{
+			[]int{ 15, 30, 45, 60, 75, 90, 105 }, // up left
+			[]int{ 17, 34, 51, 68, 85, 102, 119 }, // up right
+			[]int{ -15, -30, -45, -60, -75, -90, -105 }, // down left
+			[]int{ -17, -34, -51, -68, -85, -102, -119 }, // down right
+		},
+		(1 << uint(Rook)) | (1 << uint(Queen)): [][]int{
+			[]int{ 16, 32, 48, 64, 80, 96, 112 }, // up
+			[]int{ 1, 2, 3, 4, 5, 6, 7 }, // right
+			[]int{ -16, -32, -48, -64, -80, -96, -112 }, // down
+			[]int{ -1, -2, -3, -4, -5, -6, -7 }, // left
+		},
+		(1 << uint(Knight)): [][]int{ PieceDelta[Knight] },
+		(1 << uint(King)): [][]int{ PieceDelta[King] },
+		(1 << uint(Pawn)): [][]int{
+			[]int{ 
+				PieceDelta[Pawn][White] - 1,
+				PieceDelta[Pawn][White] + 1,
+			},
+		},
+	},
+	map[int][][]int{
+		(1 << uint(Bishop)) | (1 << uint(Queen)): [][]int{
+			[]int{ 15, 30, 45, 60, 75, 90, 105 }, // up left
+			[]int{ 17, 34, 51, 68, 85, 102, 119 }, // up right
+			[]int{ -15, -30, -45, -60, -75, -90, -105 }, // down left
+			[]int{ -17, -34, -51, -68, -85, -102, -119 }, // down right
+		},
+		(1 << uint(Rook)) | (1 << uint(Queen)): [][]int{
+			[]int{ 16, 32, 48, 64, 80, 96, 112 }, // up
+			[]int{ 1, 2, 3, 4, 5, 6, 7 }, // right
+			[]int{ -16, -32, -48, -64, -80, -96, -112 }, // down
+			[]int{ -1, -2, -3, -4, -5, -6, -7 }, // left
+		},
+		(1 << uint(Knight)): [][]int{ PieceDelta[Knight] },
+		(1 << uint(King)): [][]int{ PieceDelta[King] },
+		(1 << uint(Pawn)): [][]int{
+			[]int{ 
+				PieceDelta[Pawn][Black] - 1,
+				PieceDelta[Pawn][Black] + 1,
+			},
+		},
+	},
+}
+
 func (g *Game) IsLegalMove(move *Move) bool {
 	if Offboard(move.Origin) || Offboard(move.Dest) {
 		return false
@@ -72,6 +120,28 @@ func (g *Game) IsLegalMove(move *Move) bool {
 }
 
 func (g *Game) InCheck(tile int) bool {
+	for pieces, attacks := range AttackTable[g.Turn.Opponent()] {
+		for _, direction := range attacks {
+			for _, delta := range direction {
+				if Offboard(tile + delta) {
+					break
+				}
+
+				// check to see if a piece is there
+				if p := g.Position[tile]; p != nil {
+					bit := 1 << uint(p.Kind)
+
+					// my piece or wrong piece
+					if p.Color == g.Turn  || (pieces & bit == 0) {
+						break
+					}
+
+					// enenmy piece of the right type
+					return true
+				}
+			}
+		}
+	}
 
 	return false
 }

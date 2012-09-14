@@ -16,6 +16,7 @@ type Move struct {
 	Castle int                // castle move: Kingside or Queenside
 	EnPassant bool            // was an en passant capture
 	Pawn, Push, Promote bool  // pawn move, 2 space push, promotion
+	Check bool                // true if it puts enemy in check
 	Kind Kind                 // what was moved or promotion
 }
 
