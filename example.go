@@ -15,7 +15,9 @@ func main() {
 
 	g.Position.Render()
 
-	moves := g.LegalMoves()
+	moves := g.CollectMoves()
 
-	fmt.Println(len(moves))
+	for _, move := range moves {
+		fmt.Println(move.LongNotation())
+	}
 }

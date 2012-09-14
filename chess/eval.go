@@ -1,67 +1,135 @@
 package chess
 
-type Move struct {
-	Origin, Dest int          // where it is moving from and to
-	Capture bool              // captured another piece
-	Castle int                // castle move: Kingside or Queenside
-	EnPassant bool            // was an en passant capture
-	Pawn, Push, Promote bool  // pawn move, 2 space push, promotion
-	Kind Kind                 // what was moved or promotion
-}
+func (g *Game) IsLegalMove(move *Move) bool {
+	if Offboard(move.Origin) || Offboard(move.Dest) {
+		return false
+	}
 
-type MoveList chan *Move     // scatter-gathering of moves
+	p := g.Position[move.Origin]
+	x := g.Position[move.Dest]
 
-const (
-	Kingside = 1 + iota
-	Queenside
-)
+	// the piece exists and is owned by the current player
+	if p == nil || p.Color != g.Turn {
+		return false
+	}
 
-func (moves *MoveList) Collect(pos *Position, turn Color) {
-	for rank := 0; rank < 8; rank++ {
-		for file := 0; file < 8; file++ {
-			tile := Tile(rank, file)
+	if move.Castle != 0 {
+		if g.Castles & (move.Castle << uint(g.Turn << 2)) == 0 {
+			return false
+		}
 
-			if p := pos[tile]; p != nil && p.Color == turn {
-				moves.CollectPawnMoves(pos, tile, turn)
-			} else {
-				moves.CollectNonPawnMoves(pos, tile, turn, p.Kind)
+		// queenside castles move down in file
+		if move.Castle == Kingside {
+			for i := 0; i < 3; i++ {
+				if g.InCheck(g.King[g.Turn] + i) {
+					return false
+				}
+			}
+		} else {
+			for i := 0; i < 3; i++ {
+				if g.InCheck(g.King[g.Turn] - i) {
+					return false
+				}
 			}
 		}
-	}
-}
 
-func (moves MoveList) PieceMoves(g *Game, tile int) {
-	if Offboard(tile) == false {
-		if p := g.Position[tile]; p != nil {
-			if p.Kind == Pawn {
-				moves.PawnMoves(g, tile)
-			} else {
-				moves.NonPawnMoves(g, tile)
-			}
+		return true
+	}
+
+	if move.Pawn {
+		if p.Kind != Pawn {
+			return false
+		}
+
+		// can only push pawns on the pawn rank
+		if move.Push && Rank(move.Origin) != PawnRank[g.Turn] {
+			return false
+		}
+
+		// make sure en passant is valid
+		if move.EnPassant && move.Dest != g.EnPassant {
+			return false
 		}
 	}
+
+	// undo
+	defer func() {
+		g.Position[move.Origin] = p
+		g.Position[move.Dest] = x
+	}()
+
+	// make move
+	g.Position[move.Origin] = nil
+	g.Position[move.Dest] = p
+
+	// verify (if the king moved) it isn't in check
+	if move.Origin == g.King[g.Turn] {
+		return g.InCheck(move.Dest) == false
+	}
+
+	// verify the king isn't in check
+	return g.InCheck(g.King[g.Turn]) == false
 }
 
-func (moves MoveList) PawnMoves(g *Game, tile int) {
-	
+func (g *Game) InCheck(tile int) bool {
 
+	return false
+}
+
+func (g *Game) CollectMoves() []*Move {
+	pseudoMoves := make(chan *Move)
+	moves := make([]*Move, 0, 30)
+
+	go func() {
+		for rank := 0; rank < 8; rank++ {
+			for file := 0; file < 8; file++ {
+				tile := Tile(rank, file)
+
+				// only collect moves for this player
+				if p := g.Position[tile]; p != nil && p.Color == g.Turn {
+					if p.Kind == Pawn {
+						g.PawnMoves(pseudoMoves, tile)
+					} else {
+						g.NonPawnMoves(pseudoMoves, tile, p.Kind)
+					}
+				}
+			}
+		}
+
+		// add castling moves
+		g.CastleMoves(pseudoMoves)
+
+		// all pseudo legal moves have been collected
+		close(pseudoMoves)
+	}()
+
+	// filter legal moves from the pseudo legal ones
+	for move := range pseudoMoves {
+		if g.IsLegalMove(move) {
+			moves = append(moves, move)
+		}
+	}
+
+	return moves
+}
+
+func (g *Game) PawnMoves(ch chan *Move, tile int) {
 	d := PieceDelta[Pawn][g.Turn]
-	back := BackRank[g.Turn.Opponent()]
 	x := tile + d
 
 	// advance forward once (can't be off board)
 	if g.Position[x] == nil {
-		c <- &Move{
+		ch <- &Move{
 			Origin: tile,
 			Dest: x,
 			Pawn: true,
-			Promote: Rank(x) == back,
+			Promote: Rank(x) == BackRank[g.Turn.Opponent()],
 		}
 
 		// try pushing the pawn?
 		if Rank(tile) == PawnRank[g.Turn] {
 			if g.Position[x + d] == nil {
-				c <- &Move{
+				ch <- &Move{
 					Origin: tile,
 					Dest: x + d,
 					Pawn: true,
@@ -79,7 +147,7 @@ func (moves MoveList) PawnMoves(g *Game, tile int) {
 
 		// en passant capture?
 		if tile + d + i == g.EnPassant {
-			c <- &Move{
+			ch <- &Move{
 				Origin: tile,
 				Dest: x + i,
 				Pawn: true,
@@ -90,19 +158,19 @@ func (moves MoveList) PawnMoves(g *Game, tile int) {
 			p := g.Position[x + i]
 
 			if p != nil && p.Color != g.Turn {
-				c <- &Move{
+				ch <- &Move{
 					Origin: tile,
 					Dest: x + i,
 					Pawn: true,
 					Capture: true,
-					Promote: Rank(x + i) == back,
+					Promote: Rank(x + i) == BackRank[g.Turn.Opponent()],
 				}
 			}
 		}
 	}
 }
 
-func nonPawnMoves(c chan *Move, g *Game, tile int, kind Kind) {
+func (g *Game) NonPawnMoves(ch chan *Move, tile int, kind Kind) {
 	for _, d := range PieceDelta[kind] {
 		capture := false
 
@@ -116,7 +184,7 @@ func nonPawnMoves(c chan *Move, g *Game, tile int, kind Kind) {
 				}
 			}
 
-			c <- &Move{
+			ch <- &Move{
 				Origin: tile,
 				Dest: x,
 				Capture: capture,
@@ -130,7 +198,7 @@ func nonPawnMoves(c chan *Move, g *Game, tile int, kind Kind) {
 	}
 }
 
-func castleMoves(ch chan *Move, g *Game) {
+func (g *Game) CastleMoves(ch chan *Move) {
 	tile := Tile(BackRank[g.Turn], 4)
 
 	// is the kingside castle available?
