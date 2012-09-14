@@ -30,12 +30,12 @@ var AttackTable = map[int][][]int{
 }
 
 func (g *Game) IsLegalMove(move *Move) bool {
-	if Offboard(move.Origin) || Offboard(move.Dest) {
+	p := g.Position.Piece(move.Origin)
+	x := g.Position.Piece(move.Dest)
+
+	if Offboard(move.Dest) || p == nil {
 		return false
 	}
-
-	p := g.Position[move.Origin]
-	x := g.Position[move.Dest]
 
 	// the piece exists and is owned by the current player
 	if p == nil || p.Color != g.Turn {
@@ -47,7 +47,7 @@ func (g *Game) IsLegalMove(move *Move) bool {
 			return false
 		}
 
-		// queenside castles move down in file
+		// queenside castles move down in file, kingside up
 		if move.Castle == Kingside {
 			for i := 0; i < 3; i++ {
 				if g.InCheck(g.King[g.Turn] + i) {
@@ -81,7 +81,7 @@ func (g *Game) IsLegalMove(move *Move) bool {
 		}
 	}
 
-	// undo
+	// undo regardless
 	defer func() {
 		g.Position[move.Origin] = p
 		g.Position[move.Dest] = x
@@ -91,13 +91,15 @@ func (g *Game) IsLegalMove(move *Move) bool {
 	g.Position[move.Origin] = nil
 	g.Position[move.Dest] = p
 
-	// verify (if the king moved) it isn't in check
-	if move.Origin == g.King[g.Turn] {
-		return g.InCheck(move.Dest) == false
+	// get the king's location
+	king := g.King[g.Turn]
+
+	// if the king moved, update the king's location
+	if move.Kind == King {
+		king = move.Dest
 	}
 
-	// verify the king isn't in check
-	return g.InCheck(g.King[g.Turn]) == false
+	return g.InCheck(king) == false
 }
 
 func (g *Game) InCheck(tile int) bool {
