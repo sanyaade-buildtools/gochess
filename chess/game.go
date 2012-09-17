@@ -34,7 +34,10 @@ const (
 	Mate
 )
 
-func (g *Game) New() {
+func NewGame() *Game {
+	g := new(Game)
+
+	// setup the new board
 	g.Position.New()
 
 	// initial state for a new game
@@ -45,6 +48,8 @@ func (g *Game) New() {
 	g.Castles = 15
 	g.HalfMove = 0
 	g.Move = 1
+
+	return g
 }
 
 func (g *Game) PerformMove(move *Move) {

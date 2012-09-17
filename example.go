@@ -1,17 +1,16 @@
 package main
 
 import (
-//	"fmt"
-)
-
-import (
-//	"./chess"
+	"./chess"
 //	"./fen"
-	"./pgn"
+//	"./pgn"
 )
-
-var game = "/Users/jeff/Dropbox/Public/Chess Games/AaronLedlie_vs_massung_2012_08_30.pgn"
 
 func main() {
-	pgn.Parse(game)
+	g := chess.NewGame()
+
+	g.PerformMove(g.ParseMove("e4"))
+	g.PerformMove(g.ParseMove("e5"))
+
+	g.Position.Render()
 }

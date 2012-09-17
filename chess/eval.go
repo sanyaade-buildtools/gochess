@@ -1,5 +1,15 @@
 package chess
 
+import (
+	"regexp"
+	"unicode"
+)
+
+// regular expression for parsing short-/long-hand algebraic moves
+var reMove = regexp.MustCompile(
+	"^O-(?:O-)?O|([PNBRQK])?([a-h]?[1-8]?)(x|-)?([a-h][1-8])(=[NBRQ])?$",
+)
+
 var PawnAttackTable = [2][]int{
 	[]int{ -15, -17 },
 	[]int{ 15, 17 },
@@ -287,4 +297,115 @@ func (g *Game) CastleMoves(ch chan *Move) {
 			}
 		}
 	}
+}
+
+func (g *Game) ParseMove(s string) *Move {
+	var m []string
+	var castle int
+	var k Kind
+	var move *Move
+
+	// try and parse the move string
+	if m = reMove.FindStringSubmatch(s); m == nil {
+		return nil
+	}
+
+	// get all the available moves
+	moves := g.CollectMoves()
+
+	// check for a castling move
+	switch m[0] {
+		case "O-O":   castle = Kingside; break
+		case "O-O-O": castle = Queenside; break
+	}
+
+	// get the piece kind being moved
+	switch m[1] {
+		case "P", "": k = Pawn; break
+		case "N":     k = Knight; break
+		case "B":     k = Bishop; break
+		case "R":     k = Rook; break
+		case "Q":     k = Queen; break
+		case "K":     k = King; break
+	}
+
+	// determine if there has been a capture
+	x := m[3] == "x"
+
+	// parse the final, destination tile being moved to
+	tile := Tile(
+		int(byte(m[4][1]) - byte('1')),
+		int(byte(m[4][0]) - byte('a')),
+	)
+
+	// check for a pawn promotion
+	promote := len(m[5]) > 0
+
+	// determine if this move can match
+	filter := func(move *Move) bool {
+		switch {
+			case move.Castle != castle:   return false
+			case move.Dest != tile:       return false
+			case move.Capture != x:       return false
+			case move.Promote != promote: return false
+		}
+
+		// pawn move or same piece being moved
+		return move.Pawn && k == Pawn || move.Kind == k
+	}
+
+	// filter moves targeting the same destination and capture
+	for i := 0; i < len(moves); {
+		if filter(moves[i]) == false {
+			moves[i] = moves[len(moves) - 1]
+			moves = moves[:len(moves) - 1]
+		} else {
+			i++
+		}
+	}
+
+	// no matching legal moves left?
+	if len(moves) == 0 {
+		return nil
+	}
+
+	// move origin
+	rank := -1
+	file := -1
+
+	// the origin can be the file, rank, or both
+	switch len(m[2]) {
+		case 1:
+			if unicode.IsDigit(rune(m[2][0])) {
+				rank = int(byte(m[2][0]) - byte('1'))
+			} else {
+				file = int(byte(m[2][0]) - byte('a'))
+			}
+			break
+		case 2:
+			file = int(byte(m[2][0]) - byte('a'))
+			rank = int(byte(m[2][1]) - byte('1'))
+			break
+	}
+
+	// find the move that best matches the origin
+	for i := 0; i < len(moves); i++ {
+		if file >= 0 && File(moves[i].Origin) != file { continue }
+		if rank >= 0 && Rank(moves[i].Origin) != rank { continue }
+
+		// the rank or the file matches
+		if move != nil {
+			return nil
+		}
+
+		// this move matches the origin
+		move = moves[i]
+	}
+
+	// set the promotion kind for the move
+	if move.Promote && promote {
+		move.Kind = k
+	}
+
+	return move
 }
