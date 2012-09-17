@@ -3,17 +3,11 @@ package pgn
 import "../chess"
 
 import (
-	"bufio"
-	"os"
-	"bytes"
+	"io/ioutil"
 	"regexp"
 )
 
 type PGN struct {
-	Games []Game                // all the games in the PGN
-}
-
-type Game struct {
 	Tags map[string]string      // settings at the top of the file
 	Moves [][2]*Move            // list of moves made
 	Result int                  // end game result
@@ -33,53 +27,75 @@ const (
 	BlackWins
 )
 
-func Parse(filename string) (*PGN, error) {
-	file, err := os.Open(filename)
+var reTagPair, _ = regexp.Compile("^\\[([^\\s\t]+)\\s*\"([^\"]*)\"\\]")
+var reWhitespace, _ = regexp.Compile("[\\s\\n]*")
+
+func Parse(filename string) ([]*PGN, error) {
+	bytes, err := ioutil.ReadFile(filename)
 
 	if err != nil {
 		return nil, err
 	}
 
-	// create a line reader and the pgn
-	reader := bufio.NewReader(file)
-	pgn := new(PGN)
+	// create a channel for pgn games
+	games := make(chan *PGN)
+	pgns := make([]*PGN, 0, 1)
 
-	for {
-		if err = pgn.ParseGame(); err != nil {
+	// start the process of parsing the games
+	go ParseGames(games, bytes, &err)
+
+	// slurp in each game as it was read
+	for game := range games {
+		pgns = append(pgns, game)
+	}
+
+	// error is non-nil if a game failed to parse
+	return pgns, err
+}
+
+func ParseGames(ch chan *PGN, text []byte, err *error) {
+	var game *PGN
+
+	for len(text) > 0 {
+		if game, *err = ParseGame(&text); *err != nil {
 			break
 		}
+
+		// write the game
+		ch <- game
 	}
 
-	return pgn, err
+	close(ch)
 }
 
-func (pgn *PGN) ParseGame(reader *Reader) error {
+func ParseGame(text *[]byte) (*PGN, error) {
 	var err error
 
-	if err = pgn.ParseTagPairs(); err != nil { return err }
+	// create the PGN to parse into
+	pgn := new(PGN)
 
-	return nil
+	// parse the various sections
+	if err = pgn.ParseTagPairs(text); err != nil { return nil, err }
+
+	return pgn, nil
 }
 
-func (pgn *PGN) ParseTagPairs(reader *Reader) error {
-	pgn.Header = make(map[string]string)
-
-	// header match expression
-	re := regexp.Compile("\\[([^\\s\t]+)\\s*\"([^\"]*)\"\\]")
+func (pgn *PGN) ParseTagPairs(text *[]byte) error {
+	pgn.Tags = make(map[string]string)
 
 	for {
-		line, prefix, err := reader.ReadLine()
-
-		if err != nil {
-			return nil, err
-		}
-
-		match := re.FindSubmatch(line)
+		match := reTagPair.FindSubmatch(*text)
 
 		if match == nil {
-			return header, nil
+			return nil
 		}
+
+		// add the tag to the PGN
+		pgn.Tags[string(match[1])] = string(match[2])
+
+		// advance the pointer
+		*text = (*text)[len(match[0]):]
 	}
 
-	return header, nil
+	return nil
 }

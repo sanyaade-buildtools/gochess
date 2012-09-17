@@ -6,12 +6,12 @@ import (
 
 import (
 //	"./chess"
-	"./fen"
-//	"./pgn"
+//	"./fen"
+	"./pgn"
 )
 
-func main() {
-	g := fen.Parse(fen.Start)
+var game = "/Users/jeff/Dropbox/Public/Chess Games/AaronLedlie_vs_massung_2012_08_30.pgn"
 
-	g.Position.Render()
+func main() {
+	pgn.Parse(game)
 }
