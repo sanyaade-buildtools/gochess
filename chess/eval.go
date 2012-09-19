@@ -241,7 +241,7 @@ func (g *Game) NonPawnMoves(ch chan *Move, tile int, kind Kind) {
 		capture := false
 
 		// sliding pieces keep moving along that direction
-		for x := tile + d; capture || Offboard(x) == false; x += d {
+		for x := tile + d; !Offboard(x) && !capture; x += d {
 			if p := g.Position.Piece(x); p != nil {
 				if p.Color != g.Turn {
 					capture = true

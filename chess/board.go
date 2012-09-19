@@ -20,7 +20,7 @@ func File(tile int) int {
 }
 
 func Offboard(tile int) bool {
-	return tile & 0x88 != 0
+	return tile < 0 || tile > 127 || (tile & 0x88) != 0
 }
 
 func (b *Board) Clear() {
