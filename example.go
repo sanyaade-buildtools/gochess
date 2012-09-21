@@ -22,8 +22,9 @@ func main() {
 	g := chess.NewGame()
 
 	for _, move := range moves {
-		fmt.Println(move)
-		g.PerformMove(g.ParseMove(move))
+		x := g.ParseMove(move)
+		fmt.Println(move, x)
+		g.PerformMove(x)
 		g.Position.Render()
 	}
 }

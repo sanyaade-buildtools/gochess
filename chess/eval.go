@@ -1,13 +1,14 @@
 package chess
 
 import (
+	"fmt"
 	"regexp"
 	"unicode"
 )
 
 // regular expression for parsing short-/long-hand algebraic moves
 var reMove = regexp.MustCompile(
-	"^O-(?:O-)?O|([PNBRQK])?([a-h]?[1-8]?)(x|-)?([a-h][1-8])(=[NBRQ])?$",
+	"^O-(?:O-)?O|([PNBRQK])?([a-h]?[1-8]?)(x|-)?([a-h][1-8])(=[NBRQ])?[+#]?$",
 )
 
 var PawnAttackTable = [2][]int{
@@ -307,11 +308,14 @@ func (g *Game) ParseMove(s string) *Move {
 
 	// try and parse the move string
 	if m = reMove.FindStringSubmatch(s); m == nil {
+		fmt.Println("HERE")
 		return nil
 	}
 
 	// get all the available moves
 	moves := g.CollectMoves()
+
+	fmt.Println(moves)
 
 	// check for a castling move
 	switch m[0] {
@@ -366,6 +370,7 @@ func (g *Game) ParseMove(s string) *Move {
 
 	// no matching legal moves left?
 	if len(moves) == 0 {
+		fmt.Println("HERE2")
 		return nil
 	}
 
@@ -395,6 +400,7 @@ func (g *Game) ParseMove(s string) *Move {
 
 		// the rank or the file matches
 		if move != nil {
+			fmt.Println("HERE3")
 			return nil
 		}
 
